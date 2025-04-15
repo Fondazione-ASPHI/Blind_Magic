@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MTG Card Scanner - Fuzzy Search</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 1em;
+    }
+
+    video {
+      height: 100px;
+      /* Set the height to 100px */
+      width: auto;
+      /* Let the width adjust automatically to maintain the aspect ratio */
+      object-fit: contain;
+      /* Ensure the video content fits within the box while maintaining the aspect ratio */
+      border: 5px solid #ccc;
+      /* Optional: Add a border for styling */
+    }
+
+    #status {
+      font-family: monospace;
+      white-space: pre-wrap;
+      background: #f9f9f9;
+      padding: 0.5em;
+      margin-top: 0.5em;
+    }
+
+    #cardInfo {
+      margin-top: 1em;
+    }
+
+    #cardInfo h2 {
+      margin: 0.2em 0;
+    }
+
+    #speakBtn {
+      margin-top: 0.5em;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #controlButtons {
+      margin-top: 1em;
+    }
+
+    #controlButtons button {
+      margin-right: 0.5em;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>MTG Card Scanner - by ASPHI Onlus</h1>
+  </header>
+
+  <main>
+    <!-- START/STOP Buttons -->
+    <div id="controlButtons">
+      <button id="saveSettingsBtn" type="button" aria-label="Start scanning">START</button>
+      <button id="stopScanBtn" type="button" style="display:none;" aria-label="Stop scanning">STOP</button>
+    </div>
+
+    <!-- Card Information Section -->
+    <section aria-labelledby="lifePointsSectionLabel">
+      <h2>Life Points</h2>
+      <input type="number" id="numberInput" value="20" />
+    </section>
+
+    <!-- Card Information Section -->
+    <section aria-labelledby="cardInfoSectionLabel">
+      <h2 id="cardNameWord">Card Info</h2>
+      <div id="cardInfo"></div>
+      <button id="speakBtn" style="display:none;" aria-label="Read card description">🔊 Read Description</button>
+    </section>
+
+    <!-- Settings Section -->
+    <h2>Settings</h2>    
+    <section aria-labelledby="settingsSectionLabel">
+      
+      <label for="languageSelect">Language:</label>
+      <select aria-label="Select Language" id="languageSelect">
+        <option value="none" selected>None</option>
+        <option value="en">English</option>
+        <option value="it">Italian</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="es">Spanish</option>
+        <option value="pt">Portuguese</option>
+        <option value="ja">Japanese</option>
+        <option value="ko">Korean</option>
+        <option value="ru">Russian</option>
+        <option value="zh">Chinese</option>
+      </select>
+
+      <fieldset>
+        <legend id="settingsFormLabel">API settings</legend>
+        <label for="azureEndpoint">Azure Endpoint:</label>
+        <input aria-label="Input field for Azure Endpoint" type="password" id="azureEndpoint" placeholder="Enter Azure Endpoint" aria-required="true" />
+        <br>
+        <label for="azureApiKey">Azure API Key:</label>
+        <input aria-label="Input field for Azure API Key" type="password" id="azureApiKey" placeholder="Enter Azure API Key" aria-required="true" />
+        <br>
+      </fieldset>
+
+      <label for="enableSpeechSynthesis">
+        <input type="checkbox" id="enableSpeechSynthesis" /> Enable Speech Synthesis
+      </label>
+
+
+    </section>
+
+    <!-- Debug Section -->
+    <h2>Debug</h2>  
+    <button id="toggleCameraBtn" type="button" aria-expanded="false" aria-label="Show or hide camera preview">Show
+      Camera Preview</button>
+    <video id="video" class="hidden" autoplay playsinline muted aria-label="Camera feed">Camera feed not
+      available.</video>
+    </section>
+
+    <!-- Show/Hide Status Button -->
+    <button id="toggleStatusBtn" type="button" aria-expanded="false" aria-label="Show or hide status">Show status</button>
+    <!-- Status Form -->
+    <form id="settingsForm" class="hidden" aria-labelledby="settingsFormLabel">
+      <!-- Status Section -->
+      <section aria-labelledby="statusSectionLabel">
+        <!-- <h2 id="statusSectionLabel">Status</h2> -->
+        <div id="status" role="status"></div>
+      </section>
+
+
+    </form>
+  </main>
+
+  <footer>
+    <p>MTG Card Scanner - Developed by ASPHI Onlus</p>
+  </footer>
+
+  <script>
+    const video = document.getElementById('video');
+    const statusDiv = document.getElementById('status');
+    const cardNameWord = document.getElementById('cardNameWord');
+    const cardInfoDiv = document.getElementById('cardInfo');
+    const speakBtn = document.getElementById('speakBtn');
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+    const stopScanBtn = document.getElementById('stopScanBtn');
+    const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+    const toggleStatusBtn = document.getElementById('toggleStatusBtn');
+    const settingsForm = document.getElementById('settingsForm');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const enableSpeechSynthesisCheckbox = document.getElementById('enableSpeechSynthesis');
+    const languageSelect = document.getElementById('languageSelect');
+
+    let azureEndpoint = ""; // Azure endpoint URL
+    let azureApiKey = ""; // Azure API key
+    let selectedLanguage = 'none'; // Default to "None"
+    let isSpeechSynthesisEnabled = false; // Speech synthesis is disabled by default
+
+    let isProcessing = false;
+    let scanInterval;
+    let lastCardLanguage = 'en'; // Default to English
+
+    let lastRecognizedText = ""; // Stores the last recognized text
+    let noChangeDuration = 0; // Tracks the duration of no change in recognized text
+    let repeatedTextCount = 0; // Tracks how many times the same text is recognized
+    const MAX_NO_CHANGE_DURATION = 60000; // 1 minute in milliseconds
+    const MAX_REPEATED_TEXT_COUNT = 2; // Maximum allowed repeated recognitions
+
+    let movementDetectionTimeout; // Timeout for movement detection
+    let ignoreFirstMovement = false; // Flag to ignore the first movement detection
+    let movementWithoutCardCount = 0; // Counter for consecutive movements without identifying a card
+    const MAX_MOVEMENT_WITHOUT_CARD = 5; // Maximum allowed movements without identifying a card
+
+    const translations = {
+      cost: {
+        en: "Cost",
+        it: "Costo",
+        fr: "Coût",
+        de: "Kosten",
+        es: "Costo",
+        pt: "Custo",
+        ja: "コスト",
+        ko: "비용",
+        ru: "Стоимость",
+        zh: "费用"
+      },
+      colorIdentity: {
+        en: "Color Identity",
+        it: "Identità Colore",
+        fr: "Identité de Couleur",
+        de: "Farbidentität",
+        es: "Identidad de Color",
+        pt: "Identidade de Cor",
+        ja: "色の識別",
+        ko: "색 정체성",
+        ru: "Цветовая идентичность",
+        zh: "颜色标识"
+      }
+    };
+
+    function logStatus(msg) {
+      // console.log(msg);
+      statusDiv.textContent = msg;
+    }
+
+    function setCookie(name, value, days) {
+      const d = new Date();
+      d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+      const expires = "expires=" + d.toUTCString();
+      document.cookie = name + "=" + value + ";" + expires + ";path=/";
+      console.log(`Cookie set: ${name}=${value}`);
+    }
+
+    function getCookie(name) {
+      const nameEQ = name + "=";
+      const ca = document.cookie.split(';');
+      for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+      }
+      return null;
+    }
+
+    function loadSettings() {
+      azureEndpoint = getCookie('azureEndpoint');
+      azureApiKey = getCookie('azureApiKey');
+      selectedLanguage = getCookie('selectedLanguage') || 'none'; // Default to "None" if not set
+      isSpeechSynthesisEnabled = getCookie('isSpeechSynthesisEnabled') === 'true'; // Default to false if not set
+
+      logStatus(`Loaded settings: azureEndpoint=${azureEndpoint}, azureApiKey=${azureApiKey}, selectedLanguage=${selectedLanguage}, isSpeechSynthesisEnabled=${isSpeechSynthesisEnabled}`);
+
+      if (azureEndpoint) document.getElementById('azureEndpoint').value = azureEndpoint;
+      if (azureApiKey) document.getElementById('azureApiKey').value = azureApiKey;
+      if (selectedLanguage) languageSelect.value = selectedLanguage;
+      enableSpeechSynthesisCheckbox.checked = isSpeechSynthesisEnabled;
+    }
+
+    saveSettingsBtn.addEventListener('click', () => {
+      azureEndpoint = document.getElementById('azureEndpoint').value;
+      azureApiKey = document.getElementById('azureApiKey').value;
+      setCookie('azureEndpoint', azureEndpoint, 365);
+      setCookie('azureApiKey', azureApiKey, 365);
+      logStatus("Settings saved. Starting camera...");
+      movementWithoutCardCount = 0; // Reset the movement counter
+      startCamera();
+    });
+
+    stopScanBtn.addEventListener('click', () => {
+      clearInterval(scanInterval);
+      video.srcObject.getTracks().forEach(track => track.stop());
+      logStatus("Camera scan stopped.");
+      stopScanBtn.style.display = "none";
+      saveSettingsBtn.style.display = "inline-block";
+    });
+
+    toggleCameraBtn.addEventListener('click', () => {
+      if (video.classList.contains('hidden')) {
+        video.classList.remove('hidden');
+        toggleCameraBtn.textContent = "Hide Camera Preview";
+        toggleCameraBtn.ariaExpanded = "true";
+      } else {
+        video.classList.add('hidden');
+        toggleCameraBtn.textContent = "Show Camera Preview";
+        toggleCameraBtn.ariaExpanded = "false";
+      }
+    });
+
+    toggleStatusBtn.addEventListener('click', () => {
+      if (settingsForm.classList.contains('hidden')) {
+        settingsForm.classList.remove('hidden');
+        toggleStatusBtn.textContent = "Hide status";
+        toggleStatusBtn.ariaExpanded = "true";
+      } else {
+        settingsForm.classList.add('hidden');
+        toggleStatusBtn.textContent = "Show status";
+        toggleStatusBtn.ariaExpanded = "false";
+      }
+    });
+
+    // Update the state when the checkbox is toggled
+    enableSpeechSynthesisCheckbox.addEventListener('change', () => {
+      isSpeechSynthesisEnabled = enableSpeechSynthesisCheckbox.checked;
+      setCookie('isSpeechSynthesisEnabled', isSpeechSynthesisEnabled, 365); // Save the state in a cookie
+      logStatus(`Speech synthesis ${isSpeechSynthesisEnabled ? 'enabled' : 'disabled'}.`);
+
+      // Show or hide the "Read Description" button based on the checkbox state
+      speakBtn.style.display = isSpeechSynthesisEnabled ? "inline-block" : "none";
+    });
+
+    // Update the selectedLanguage variable when the dropdown changes
+    languageSelect.addEventListener('change', () => {
+      selectedLanguage = languageSelect.value;
+      logStatus(`Language set to: ${selectedLanguage === 'none' ? 'None (no filtering)' : selectedLanguage}`);
+      setCookie('selectedLanguage', selectedLanguage, 365); // Save the selected language in a cookie
+    });
+
+    async function startCamera() {
+      try {
+        // Reset the auto-stop variables
+        noChangeDuration = 0;
+        repeatedTextCount = 0;
+        lastRecognizedText = "";
+
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        video.srcObject = stream;
+        video.play();
+        logStatus("Camera initialized. Scanning for cards...");
+        stopScanBtn.style.display = "inline-block";
+        saveSettingsBtn.style.display = "none";
+
+        // Stop movement detection when the camera starts
+        clearTimeout(movementDetectionTimeout);
+      } catch (err) {
+        logStatus("Camera access error: " + err.message);
+      }
+    }
+
+    video.onloadedmetadata = () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    };
+
+    video.onplay = () => {
+      scanInterval = setInterval(captureAndRecognize, 500);
+    };
+
+    async function captureAndRecognize() {
+      if (isProcessing) return;
+      isProcessing = true;
+
+      // const azureEndpoint = document.getElementById('azureEndpoint').value;
+      // const azureApiKey = document.getElementById('azureApiKey').value;
+      console.log(`Using settings: azureEndpoint=${azureEndpoint}, azureApiKey=${azureApiKey}`);
+      if (!azureEndpoint || !azureApiKey) {
+        logStatus("Azure settings are not configured. Please enter the Azure Endpoint and API Key.");
+        isProcessing = false;
+        return;
+      }
+      logStatus("Scanning!");
+
+      const OCR_URL = azureEndpoint + "vision/v3.0/ocr?language=it&detectOrientation=false";
+
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          isProcessing = false;
+          return;
+        }
+
+        try {
+          const ocrPromises = [];
+          for (let i = 0; i < 1; i++) {
+            ocrPromises.push(fetch(OCR_URL, {
+              method: 'POST',
+              headers: {
+                'Ocp-Apim-Subscription-Key': azureApiKey,
+                'Content-Type': 'application/octet-stream'
+              },
+              body: blob
+            }).then(response => response.json()));
+          }
+
+          const ocrResults = await Promise.all(ocrPromises);
+          let cardName = "";
+          for (const ocrData of ocrResults) {
+            if (ocrData.regions && ocrData.regions.length > 0) {
+              let lines = ocrData.regions.flatMap(region => region.lines);
+
+              // Sort lines by their bounding box size (width * height) in descending order
+              lines.sort((a, b) => {
+                const aSize = (a.boundingBox.split(',')[2] * a.boundingBox.split(',')[3]);
+                const bSize = (b.boundingBox.split(',')[2] * b.boundingBox.split(',')[3]);
+                return bSize - aSize;
+              });
+
+              if (lines.length > 0) {
+                const firstLineWords = lines[0].words || [];
+                cardName = firstLineWords.map(w => w.text).join(" ").trim();
+                if (cardName) break; // Stop if we found a card name
+              }
+            }
+          }
+
+          // Check if the recognized text has changed
+          if (cardName === lastRecognizedText) {
+            repeatedTextCount++;
+            noChangeDuration += 500; // Increment duration by the scan interval (500ms)
+          } else {
+            lastRecognizedText = cardName;
+            repeatedTextCount = 0;
+            noChangeDuration = 0;
+          }
+
+          // Stop scanning if no text is recognized for 1 minute or the same text is repeated too many times
+          if (noChangeDuration >= MAX_NO_CHANGE_DURATION || repeatedTextCount >= MAX_REPEATED_TEXT_COUNT) {
+            logStatus("No new text detected for 1 minute or repeated text detected. Stopping scan.");
+            stopScan();
+            return;
+          }
+
+          if (!cardName) {
+            logStatus("No card name detected. Try again.");
+            isProcessing = false;
+            return;
+          }
+
+          logStatus(`Detected name: "${cardName}" (searching Scryfall...)`);
+
+          // Send the first request to Scryfall
+          const scryfallUrl = selectedLanguage === 'none'
+            ? `/card?printedCardName=${encodeURIComponent(cardName)}`
+            : `/card?printedCardName=${encodeURIComponent(cardName)}&language=${selectedLanguage}`;
+          const card = await fetch(scryfallUrl).then(response => response.json());
+
+          if (card.object === "error") {
+            logStatus(`Card "${cardName}" not found.`);
+            isProcessing = false;
+            return;
+          }
+
+          displayCardInfo(card);
+
+          // Reset the movement counter after successfully identifying a card
+          movementWithoutCardCount = 0;
+
+          // Stop the scan after successfully identifying a card
+          ignoreFirstMovement = true; // Ignore the first movement detection after a successful scan
+          stopScan();
+
+        } catch (error) {
+          console.error(error);
+          logStatus("Error: " + error.message);
+        } finally {
+          isProcessing = false;
+        }
+      }, 'image/jpeg');
+    }
+
+    function stopScan() {
+      clearInterval(scanInterval);
+      // video.srcObject.getTracks().forEach(track => track.stop());
+      logStatus("Camera scan stopped. Waiting for movement to restart...");
+      stopScanBtn.style.display = "none";
+      saveSettingsBtn.style.display = "inline-block";
+
+      // Start movement detection
+      movementDetection();
+    }
+
+    function stopCameraCompletely() {
+      clearInterval(scanInterval);
+      video.srcObject.getTracks().forEach(track => track.stop());
+      logStatus("Camera completely stopped due to excessive movements without identifying a card.");
+      stopScanBtn.style.display = "none";
+      saveSettingsBtn.style.display = "inline-block";
+    }
+
+    function displayCardInfo(card) {
+      // Use the printed name and text if available, otherwise fallback to the default name and text
+      const cardName = card.printed_name || card.name;
+      const cardType = card.printed_type_line || card.type_line;
+      const rawCardText = card.printed_text || card.oracle_text;
+      const manaCost = card.mana_cost ? convertManaCost(card.mana_cost, card.lang || 'en') : '';
+      const powerToughness = card.power && card.toughness ? `${card.power}/${card.toughness}` : '';
+      const colorIdentity = card.color_identity ? convertColorIdentity(card.color_identity, card.lang || 'en') : '';
+
+      // Get localized terms
+      const localizedCost = translations.cost[selectedLanguage] || translations.cost.en;
+      const localizedColorIdentity = translations.colorIdentity[selectedLanguage] || translations.colorIdentity.en;
+
+      // Convert mana costs inside the card text
+      const cardText = rawCardText.replace(/{(.*?)}/g, (match, symbol) => {
+        return convertManaCost(`{${symbol}}`, card.lang || 'en');
+      }).replace(/\n/g, '<br>'); // Replace newlines with <br> for HTML display
+
+      // Display the card info
+      cardNameWord.textContent = cardName;
+      cardNameWord.setAttribute("aria-live", "polite");
+      cardInfoDiv.innerHTML = `
+        <p> ${manaCost ? `${localizedCost}: ${manaCost}` : ''}</p>
+        <p>${cardType} ${powerToughness ? `(${powerToughness})` : ''}</p>
+        <p>${cardText}</p>
+        <p> ${manaCost ? `${localizedColorIdentity}: ${colorIdentity}` : ''}</p>
+      `;
+      // speakBtn.style.display = "inline-block";
+
+      // Detect the language of the card
+      const cardLanguage = card.lang || 'en'; // Default to English if no language is provided
+      lastCardLanguage = cardLanguage; // Store the detected language for later use
+
+      // Use speech synthesis to pronounce the card name in the correct language
+      if (isSpeechSynthesisEnabled && 'speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(cardName);
+        utterance.lang = mapLanguageCodeToSpeechLang(cardLanguage);
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    // Map Scryfall language codes to speech synthesis language codes
+    function mapLanguageCodeToSpeechLang(langCode) {
+      const languageMap = {
+        'en': 'en-US', // English
+        'it': 'it-IT', // Italian
+        'fr': 'fr-FR', // French
+        'de': 'de-DE', // German
+        'es': 'es-ES', // Spanish
+        'pt': 'pt-PT', // Portuguese
+        'ja': 'ja-JP', // Japanese
+        'ko': 'ko-KR', // Korean
+        'ru': 'ru-RU', // Russian
+        'zh': 'zh-CN', // Chinese (Simplified)
+        // Add more mappings as needed
+      };
+
+      return languageMap[langCode] || 'en-US'; // Default to English if the language is not mapped
+    }
+
+
+    function movementDetection() {
+      const movementCanvas = document.createElement('canvas');
+      const movementContext = movementCanvas.getContext('2d');
+      movementCanvas.width = canvas.width;
+      movementCanvas.height = canvas.height;
+
+      let lastFrame = null;
+
+      function detect() {
+        if (!video.srcObject) return; // Stop if the video feed is not active
+
+        // Draw the current frame onto the movement canvas
+        movementContext.drawImage(video, 0, 0, movementCanvas.width, movementCanvas.height);
+        const currentFrame = movementContext.getImageData(0, 0, movementCanvas.width, movementCanvas.height);
+
+        if (lastFrame) {
+          let movementDetected = false;
+          const threshold = 60; // Adjust this value to control sensitivity
+          const diffPixels = 3000; // Minimum number of different pixels to consider as movement
+
+          let diffCount = 0;
+
+          // Compare the current frame with the last frame
+          for (let i = 0; i < currentFrame.data.length; i += 4) {
+            const rDiff = Math.abs(currentFrame.data[i] - lastFrame.data[i]);
+            const gDiff = Math.abs(currentFrame.data[i + 1] - lastFrame.data[i + 1]);
+            const bDiff = Math.abs(currentFrame.data[i + 2] - lastFrame.data[i + 2]);
+
+            if (rDiff > threshold || gDiff > threshold || bDiff > threshold) {
+              diffCount++;
+              if (diffCount > diffPixels) {
+                movementDetected = true;
+                break;
+              }
+            }
+          }
+
+          if (movementDetected) {
+            if (ignoreFirstMovement) {
+              ignoreFirstMovement = false; // Reset flag after first detection
+              logStatus("Movement detected BUT ignoring first detection... Card removal?");
+            } else {
+              movementWithoutCardCount++; // Increment the counter for consecutive movements
+              logStatus(`Movement detected (${movementWithoutCardCount}/${MAX_MOVEMENT_WITHOUT_CARD}).`);
+
+              // Check if the movement count exceeds the threshold
+              if (movementWithoutCardCount >= MAX_MOVEMENT_WITHOUT_CARD) {
+                logStatus("Too many movements without identifying a card. Stopping camera...");
+                stopCameraCompletely(); // Stop the camera completely
+                return; // Stop further detection
+              }
+
+              logStatus("Movement detected. Restarting camera...");
+              startCamera();
+              return; // Stop further detection
+            }
+          }
+        }
+
+        // Save the current frame as the last frame for the next comparison
+        lastFrame = currentFrame;
+
+        // Continue detecting movement
+        movementDetectionTimeout = setTimeout(detect, 500); // Check for movement every 500ms
+      }
+
+      detect();
+    }
+
+    speakBtn.addEventListener('click', () => {
+      if (!cardInfoDiv.textContent) return;
+
+      // Retrieve the card's language and text
+      const cardLanguage = lastCardLanguage || 'en'; // Use the last detected language or default to English
+      const textToRead = cardInfoDiv.innerText;
+
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(textToRead);
+        utterance.lang = mapLanguageCodeToSpeechLang(cardLanguage); // Use the detected language
+        window.speechSynthesis.speak(utterance);
+      }
+    });
+
+    // Load settings when the page loads
+    window.addEventListener('load', () => {
+      loadSettings();
+    });
+
+    function convertManaCost(manaCost, language) {
+      if (!manaCost) return '';
+
+      const manaSymbols = {
+        'W': { en: 'White', it: 'Bianco', fr: 'Blanc', de: 'Weiß', es: 'Blanco', pt: 'Branco', ja: '白', ko: '백', ru: 'Белый', zh: '白' },
+        'U': { en: 'Blue', it: 'Blu', fr: 'Bleu', de: 'Blau', es: 'Azul', pt: 'Azul', ja: '青', ko: '파랑', ru: 'Синий', zh: '蓝' },
+        'B': { en: 'Black', it: 'Nero', fr: 'Noir', de: 'Schwarz', es: 'Negro', pt: 'Preto', ja: '黒', ko: '검정', ru: 'Чёрный', zh: '黑' },
+        'R': { en: 'Red', it: 'Rosso', fr: 'Rouge', de: 'Rot', es: 'Rojo', pt: 'Vermelho', ja: '赤', ko: '빨강', ru: 'Красный', zh: '红' },
+        'G': { en: 'Green', it: 'Verde', fr: 'Vert', de: 'Grün', es: 'Verde', pt: 'Verde', ja: '緑', ko: '초록', ru: 'Зелёный', zh: '绿' },
+        'C': { en: 'Colorless', it: 'Incolore', fr: 'Incolore', de: 'Farblos', es: 'Incoloro', pt: 'Incolor', ja: '無色', ko: '무색', ru: 'Бесцветный', zh: '无色' }
+      };
+
+      return manaCost.replace(/{(.*?)}/g, (match, symbol) => {
+        if (symbol.includes('/')) {
+          // Handle hybrid mana costs (e.g., "R/W")
+          const parts = symbol.split('/');
+          const localizedParts = parts.map(part => manaSymbols[part]?.[language] || part);
+          return `(${localizedParts.join('/')})`; // Join with "or" for hybrid mana
+        } else if (!isNaN(symbol)) {
+          return symbol; // Return numeric values as-is
+        } else {
+          return manaSymbols[symbol]?.[language] || symbol; // Fallback to the symbol if no translation is found
+        }
+      });
+    }
+
+    function convertColorIdentity(colorIdentityArray, language) {
+      if (!colorIdentityArray || colorIdentityArray.length === 0) return '';
+
+      const manaSymbols = {
+        'W': { en: 'White', it: 'Bianco', fr: 'Blanc', de: 'Weiß', es: 'Blanco', pt: 'Branco', ja: '白', ko: '백', ru: 'Белый', zh: '白' },
+        'U': { en: 'Blue', it: 'Blu', fr: 'Bleu', de: 'Blau', es: 'Azul', pt: 'Azul', ja: '青', ko: '파랑', ru: 'Синий', zh: '蓝' },
+        'B': { en: 'Black', it: 'Nero', fr: 'Noir', de: 'Schwarz', es: 'Negro', pt: 'Preto', ja: '黒', ko: '검정', ru: 'Чёрный', zh: '黑' },
+        'R': { en: 'Red', it: 'Rosso', fr: 'Rouge', de: 'Rot', es: 'Rojo', pt: 'Vermelho', ja: '赤', ko: '빨강', ru: 'Красный', zh: '红' },
+        'G': { en: 'Green', it: 'Verde', fr: 'Vert', de: 'Grün', es: 'Verde', pt: 'Verde', ja: '緑', ko: '초록', ru: 'Зелёный', zh: '绿' },
+        'C': { en: 'Colorless', it: 'Incolore', fr: 'Incolore', de: 'Farblos', es: 'Incoloro', pt: 'Incolor', ja: '無色', ko: '무색', ru: 'Бесцветный', zh: '无色' }
+      };
+
+      return colorIdentityArray
+        .map(symbol => manaSymbols[symbol]?.[language] || symbol) // Map each symbol to its localized name
+        .join('/'); // Join the localized names
+    }
+  </script>
+
+</body>
+
+</html>
