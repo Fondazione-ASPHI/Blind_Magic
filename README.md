@@ -7,7 +7,7 @@ Card search relies on Scryfall database (https://scryfall.com/) using the bulk-d
 The literal and graphical information presented on this project about Magic: The Gathering, including card images and mana symbols, is copyright Wizards of the Coast, LLC. This project is not endorsed by Wizards of the Coast.
 
 
-# Setup instructions
+## Setup instructions
 
 * print 3D physical support
 * download bulk data in database/all_cards.json
@@ -17,10 +17,10 @@ The literal and graphical information presented on this project about Magic: The
 * put the device inside the 3D printed support
 
 
-# Debug tips
+### Debug tips
 https://api.scryfall.com/cards/named?fuzzy=
 
 localhost:3000/card?printedCardName=Trombettiere%20Rombosuono&language=it
 
-# Credits
+## Credits
 * Thanks to Scryfall for providing the cards database
