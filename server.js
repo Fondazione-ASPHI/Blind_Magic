@@ -1,4 +1,3 @@
-const https = require('https');
 const fs = require('fs');
 const express = require('express');
 const path = require('path');
@@ -8,12 +7,6 @@ const stringSimilarity = require('string-similarity');
 
 const app = express();
 const PORT = 3000;
-
-// Load SSL certificate and key
-const options = {
-    key: fs.readFileSync('server.key'),
-    cert: fs.readFileSync('server.cert')
-};
 
 // Serve static files from the root directory
 app.use(express.static(path.join(__dirname)));
@@ -167,8 +160,8 @@ app.get('/card', (req, res) => {
     return res.status(404).json({ error: 'Card not found in any language.' });
 });
 
-// Start the HTTPS server
-https.createServer(options, app).listen(PORT, () => {
-    console.log(`Server is running on https://localhost:${PORT}`);
+// Start the HTTP server
+app.listen(PORT, () => {
+    console.log(`Server is running on http://localhost:${PORT}`);
     loadCards(); // Load the card data when the server starts
 });

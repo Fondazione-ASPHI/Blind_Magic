@@ -1,6 +1,7 @@
 database/
 server.cert
 server.key
+*.pem
 
 # Logs
 logs
