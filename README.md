@@ -10,8 +10,9 @@ The literal and graphical information presented on this project about Magic: The
 ## Setup instructions
 
 * print 3D physical support
-* download bulk data in database/all_cards.json
+* download Scryfall bulk data in database/all_cards.json
 * npm install
+* generate https certificate: openssl req -nodes -new -x509 -keyout server.key -out server.cert -days 365
 * node --max-old-space-size=8192 server.js
 * on user device, connect to https://localhost:3000/ (replace localhost with the actual address of the server)
 * put the device inside the 3D printed support
