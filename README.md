@@ -6,8 +6,15 @@ Card search relies on Scryfall database (https://scryfall.com/) using the bulk-d
 
 The literal and graphical information presented on this project about Magic: The Gathering, including card images and mana symbols, is copyright Wizards of the Coast, LLC. This project is not endorsed by Wizards of the Coast.
 
+## Quick setup
+* print the 3D support (you can find it in the latest releases: https://github.com/Fondazione-ASPHI/Blind_Magic/releases)
+* open the web app: -public link will appear here-
+* insert your Endpoint and Apikey for OCR
+* put the phone face up on the base of the 3D support
+* press START button on the web app
+* place the card face down on the upper part of the 3D support 
 
-## Setup instructions
+## Instructions for developers
 
 * print 3D physical support
 * download Scryfall bulk data in database/all_cards.json
