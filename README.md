@@ -32,5 +32,33 @@ https://api.scryfall.com/cards/named?fuzzy=
 
 localhost:3000/card?printedCardName=Trombettiere%20Rombosuono&language=it
 
+### Hosting at a subpath (or subdirectory) of a public domain (example.yourdomain.it/subpath)
+
+#### HTTP
+Since Nginx manages HTTPS, the server.js must be reconfigured to run on HTTP.
+
+#### Nginx configuration
+Nginx: Use proxy_pass to forward /subpath requests to localhost:3000 (or wherever you are running your node server).
+
+```
+[...]
+location /subpath/ {
+        proxy_pass http://localhost:3000/;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+[...]
+```
+
+#### Frontend
+* Add <base href="/subpath/"> in head for relative links if any.
+* Update API calls to include /subpath (`/subpath/card?printedCardName=').
+
+With these changes, your app should work seamlessly under https://example.yourdomain.it/subpath
+
+
 ## Credits
 * Thanks to Scryfall for providing the cards database
