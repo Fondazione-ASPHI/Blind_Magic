@@ -62,7 +62,7 @@ function loadCards() {
 }
 
 // Endpoint to handle GET requests
-app.get('/magic/card', (req, res) => {
+app.get('/card', (req, res) => {
     const printedCardName = req.query.printedCardName;
     const language = req.query.language || 'all'; // Default to "all" if no language is provided
 
