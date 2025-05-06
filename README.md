@@ -54,8 +54,8 @@ location /subpath/ {
 ```
 
 #### Frontend
-* Add <base href="/subpath/"> in head for relative links if any.
-* Update API calls to include /subpath (`/subpath/card?printedCardName=').
+* Add ```<base href="/subpath/">``` in head for relative links if any.
+* Update API calls to include /subpath (for example in GET `/subpath/card?printedCardName=').
 
 With these changes, your app should work seamlessly under https://example.yourdomain.it/subpath
 
