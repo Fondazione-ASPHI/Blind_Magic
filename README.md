@@ -24,6 +24,7 @@ The literal and graphical information presented on this project about Magic: The
 * on user device, connect to https://localhost:3000/ (replace localhost with the actual address of the server)
 * put the device inside the 3D printed support
 * if using self-signed certificate for local testing, on mobile browsers, try to disable security restrictions, otherwise the browser app won't allow you to open the camera
+* a clean solution if owner of a public domain is to use software like nginx to manage HTTPS, in that case, the server.js must be reconfigured to run on HTTP (instead of HTTPS).
 
 
 ### Debug tips
