@@ -23,6 +23,7 @@ The literal and graphical information presented on this project about Magic: The
 * node --max-old-space-size=8192 server.js
 * on user device, connect to https://localhost:3000/ (replace localhost with the actual address of the server)
 * put the device inside the 3D printed support
+* if using self-signed certificate for local testing, on mobile browsers, try to disable security restrictions, otherwise the browser app won't allow you to open the camera
 
 
 ### Debug tips
