@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+  <base href="/magic/">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MTG Card Scanner - Fuzzy Search</title>
@@ -417,8 +418,8 @@
 
           // Send the first request to Scryfall
           const scryfallUrl = selectedLanguage === 'none'
-            ? `/card?printedCardName=${encodeURIComponent(cardName)}`
-            : `/card?printedCardName=${encodeURIComponent(cardName)}&language=${selectedLanguage}`;
+            ? `/magic/card?printedCardName=${encodeURIComponent(cardName)}`
+            : `/magic/card?printedCardName=${encodeURIComponent(cardName)}&language=${selectedLanguage}`;
           const card = await fetch(scryfallUrl).then(response => response.json());
 
           if (card.object === "error") {
