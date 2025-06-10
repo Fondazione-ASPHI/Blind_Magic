@@ -18,6 +18,9 @@ const options = {
 // Serve static files from the root directory
 app.use(express.static(path.join(__dirname)));
 
+// Parse JSON bodies
+app.use(express.json());
+
 // Load the JSON file into memory as dictionaries by language
 let cardDictionariesByLanguage = {}; // Separate dictionaries for each language
 let printedNamesByLanguage = {}; // Separate lists of printed names for each language
@@ -165,6 +168,115 @@ app.get('/card', (req, res) => {
     // Step 4: No match found
     console.log(`Card "${decodedCardName}" not found in any language.`);
     return res.status(404).json({ error: 'Card not found in any language.' });
+});
+
+// Endpoint to handle POST requests with deck list
+app.post('/card', (req, res) => {
+    const { printedCardName, deckList, language } = req.body;
+    const lang = language || 'all';
+    if (!printedCardName) {
+        return res.status(400).json({ error: 'Missing "printedCardName" in request body.' });
+    }
+    const decodedCardName = printedCardName.toLowerCase();
+
+    // If deckList is provided and non-empty, restrict best match to deckList
+    if (Array.isArray(deckList) && deckList.length > 0) {
+        console.log(`POST /card: deckList provided (${deckList.length} items).`);
+        // Use the deckList as the search pool (case-insensitive match)
+        const deckListNormalized = deckList.map(x => x.trim()).filter(Boolean);
+        const bestMatch = stringSimilarity.findBestMatch(decodedCardName, deckListNormalized);
+        console.log(`POST /card: Best match in deckList for '${decodedCardName}' is '${bestMatch.bestMatch.target}' (rating: ${bestMatch.bestMatch.rating})`);
+        const bestDeckName = bestMatch.bestMatch.target;
+        let foundCard = null;
+        // Try in selected language first
+        if (lang !== 'all') {
+            foundCard = cardDictionariesByLanguage[lang]?.[bestDeckName.toLowerCase()]?.[0];
+            if (foundCard) console.log(`POST /card: Found card in language '${lang}': ${bestDeckName}`);
+        }
+        // Fallback to English
+        if (!foundCard) {
+            foundCard = cardDictionariesByLanguage['en']?.[bestDeckName.toLowerCase()]?.[0];
+            if (foundCard) console.log(`POST /card: Found card in English: ${bestDeckName}`);
+        }
+        // Fallback to any language
+        if (!foundCard) {
+            for (const l in cardDictionariesByLanguage) {
+                if (l === lang || l === 'en') continue;
+                foundCard = cardDictionariesByLanguage[l]?.[bestDeckName.toLowerCase()]?.[0];
+                if (foundCard) {
+                    console.log(`POST /card: Found card in language '${l}': ${bestDeckName}`);
+                    break;
+                }
+            }
+        }
+        if (foundCard) {
+            return res.json(foundCard);
+        } else {
+            console.log(`POST /card: Card '${bestDeckName}' not found in any language.`);
+            return res.status(404).json({ object: 'error', error: `Card '${bestDeckName}' not found in database.` });
+        }
+    }
+    // Fallback to GET logic if no deckList
+    // Step 1: Search in the selected language
+    if (lang !== 'all') {
+        const cards = cardDictionariesByLanguage[lang]?.[decodedCardName];
+        if (cards) {
+            console.log(`POST /card: Found exact match in language '${lang}': ${decodedCardName}`);
+            return res.json(cards[0]);
+        }
+        // Best match in selected language
+        const namesToSearch = printedNamesByLanguage[lang] || [];
+        const bestMatch = stringSimilarity.findBestMatch(decodedCardName, namesToSearch);
+        console.log(`POST /card: Best match in language '${lang}' for '${decodedCardName}' is '${bestMatch.bestMatch.target}' (rating: ${bestMatch.bestMatch.rating})`);
+        if (bestMatch.bestMatch.rating > 0.5) {
+            const bestMatchName = bestMatch.bestMatch.target;
+            const bestMatchCard = cardDictionariesByLanguage[lang]?.[bestMatchName.toLowerCase()]?.[0];
+            if (bestMatchCard) {
+                console.log(`POST /card: Found best match card in language '${lang}': ${bestMatchName}`);
+                return res.json(bestMatchCard);
+            }
+        }
+    }
+    // Step 2: Fallback to English
+    const englishCards = cardDictionariesByLanguage['en']?.[decodedCardName];
+    if (englishCards) {
+        console.log(`POST /card: Found exact match in English: ${decodedCardName}`);
+        return res.json(englishCards[0]);
+    }
+    const englishNamesToSearch = printedNamesByLanguage['en'] || [];
+    const englishBestMatch = stringSimilarity.findBestMatch(decodedCardName, englishNamesToSearch);
+    console.log(`POST /card: Best match in English for '${decodedCardName}' is '${englishBestMatch.bestMatch.target}' (rating: ${englishBestMatch.bestMatch.rating})`);
+    if (englishBestMatch.bestMatch.rating > 0.5) {
+        const bestMatchName = englishBestMatch.bestMatch.target;
+        const bestMatchCard = cardDictionariesByLanguage['en']?.[bestMatchName.toLowerCase()]?.[0];
+        if (bestMatchCard) {
+            console.log(`POST /card: Found best match card in English: ${bestMatchName}`);
+            return res.json(bestMatchCard);
+        }
+    }
+    // Step 3: Fallback to all other languages
+    for (const l in cardDictionariesByLanguage) {
+        if (l === 'en' || l === lang) continue;
+        const cards = cardDictionariesByLanguage[l]?.[decodedCardName];
+        if (cards) {
+            console.log(`POST /card: Found exact match in language '${l}': ${decodedCardName}`);
+            return res.json(cards[0]);
+        }
+        const namesToSearch = printedNamesByLanguage[l] || [];
+        const bestMatch = stringSimilarity.findBestMatch(decodedCardName, namesToSearch);
+        console.log(`POST /card: Best match in language '${l}' for '${decodedCardName}' is '${bestMatch.bestMatch.target}' (rating: ${bestMatch.bestMatch.rating})`);
+        if (bestMatch.bestMatch.rating > 0.5) {
+            const bestMatchName = bestMatch.bestMatch.target;
+            const bestMatchCard = cardDictionariesByLanguage[l]?.[bestMatchName.toLowerCase()]?.[0];
+            if (bestMatchCard) {
+                console.log(`POST /card: Found best match card in language '${l}': ${bestMatchName}`);
+                return res.json(bestMatchCard);
+            }
+        }
+    }
+    // Step 4: No match found
+    console.log(`POST /card: Card '${decodedCardName}' not found in any language.`);
+    return res.status(404).json({ object: 'error', error: 'Card not found in any language.' });
 });
 
 // Start the HTTPS server

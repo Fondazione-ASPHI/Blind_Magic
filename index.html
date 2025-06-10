@@ -114,6 +114,14 @@
         <input type="checkbox" id="enableSpeechSynthesis" /> Enable Speech Synthesis
       </label>
 
+      <!-- Deck List Section -->
+      <div style="margin-top:1em;">
+        <label for="deckListTextarea">Deck list (one card per line):</label><br>
+        <textarea id="deckListTextarea" rows="6" cols="40" placeholder="Insert your deck list here, one card per line..."></textarea>
+        <br>
+        <button id="saveDeckListBtn" type="button">Save deck list</button>
+      </div>
+
 
     </section>
 
@@ -158,6 +166,10 @@
     const context = canvas.getContext('2d');
     const enableSpeechSynthesisCheckbox = document.getElementById('enableSpeechSynthesis');
     const languageSelect = document.getElementById('languageSelect');
+
+    // Deck list logic
+    const deckListTextarea = document.getElementById('deckListTextarea');
+    const saveDeckListBtn = document.getElementById('saveDeckListBtn');
 
     let azureEndpoint = ""; // Azure endpoint URL
     let azureApiKey = ""; // Azure API key
@@ -244,6 +256,15 @@
       enableSpeechSynthesisCheckbox.checked = isSpeechSynthesisEnabled;
     }
 
+    // Deck list logic
+    function saveDeckListToCookie() {
+      setCookie('deckList', deckListTextarea.value, 365);
+    }
+    function loadDeckListFromCookie() {
+      const deckList = getCookie('deckList');
+      if (deckList !== null) deckListTextarea.value = deckList;
+    }
+
     saveSettingsBtn.addEventListener('click', () => {
       azureEndpoint = document.getElementById('azureEndpoint').value;
       azureApiKey = document.getElementById('azureApiKey').value;
@@ -301,6 +322,17 @@
       selectedLanguage = languageSelect.value;
       logStatus(`Language set to: ${selectedLanguage === 'none' ? 'None (no filtering)' : selectedLanguage}`);
       setCookie('selectedLanguage', selectedLanguage, 365); // Save the selected language in a cookie
+    });
+
+    saveDeckListBtn.addEventListener('click', () => {
+      saveDeckListToCookie();
+      logStatus('Deck list saved.');
+    });
+
+    // Load settings when the page loads
+    window.addEventListener('load', () => {
+      loadSettings();
+      loadDeckListFromCookie();
     });
 
     async function startCamera() {
@@ -415,11 +447,20 @@
 
           logStatus(`Detected name: "${cardName}" (searching Scryfall...)`);
 
-          // Send the first request to Scryfall
-          const scryfallUrl = selectedLanguage === 'none'
-            ? `/card?printedCardName=${encodeURIComponent(cardName)}`
-            : `/card?printedCardName=${encodeURIComponent(cardName)}&language=${selectedLanguage}`;
-          const card = await fetch(scryfallUrl).then(response => response.json());
+          // Prepare deck list for POST
+          const deckListRaw = deckListTextarea.value.trim();
+          const deckListArr = deckListRaw ? deckListRaw.split(/\r?\n/).map(x => x.trim()).filter(x => x) : [];
+
+          // Send POST request to /card with printedCardName and deckList
+          const card = await fetch('/card', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              printedCardName: cardName,
+              deckList: deckListArr,
+              language: selectedLanguage !== 'none' ? selectedLanguage : undefined
+            })
+          }).then(response => response.json());
 
           if (card.object === "error") {
             logStatus(`Card "${cardName}" not found.`);
@@ -606,11 +647,6 @@
         utterance.lang = mapLanguageCodeToSpeechLang(cardLanguage); // Use the detected language
         window.speechSynthesis.speak(utterance);
       }
-    });
-
-    // Load settings when the page loads
-    window.addEventListener('load', () => {
-      loadSettings();
     });
 
     function convertManaCost(manaCost, language) {
