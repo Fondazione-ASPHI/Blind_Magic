@@ -4,7 +4,11 @@ The aim of this project is to enable blind or visually impaired people to play M
 
 Card search relies on Scryfall database (https://scryfall.com/) using the bulk-downloaded data.
 
-The literal and graphical information presented on this project about Magic: The Gathering, including card images and mana symbols, is copyright Wizards of the Coast, LLC. This project is not endorsed by Wizards of the Coast.
+**Copyright Notice:**  
+The literal and graphical content in this project—such as card images, mana symbols, names, oracle text, and related artwork—is © Wizards of the Coast LLC. All rights reserved.
+
+**Disclaimer:**  
+This project is unofficial fan content permitted under the Wizards of the Coast Fan Content Policy. It is neither affiliated with nor endorsed by Wizards of the Coast LLC.
 
 ## Quick setup
 * print the 3D support (you can find it in the latest releases: https://github.com/Fondazione-ASPHI/Blind_Magic/releases)
