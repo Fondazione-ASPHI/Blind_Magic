@@ -6,9 +6,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MTG Card Scanner - Fuzzy Search</title>
   <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
     body {
       font-family: sans-serif;
       margin: 1em;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    main {
+      flex: 1 0 auto;
+    }
+    footer {
+      flex-shrink: 0;
+      background: #fafafa;
+      padding: 1em 0 1.5em 0;
+      text-align: center;
+      border-top: 1px solid #eee;
     }
 
     video {
@@ -141,6 +159,13 @@
 
   <footer>
     <p>MTG Card Scanner - Developed by ASPHI Onlus</p>
+    <div style="margin-top:1em; font-size:0.95em;">
+      <strong>Copyright Notice:</strong><br>
+      The literal and graphical content in this project—such as card images, mana symbols, names, oracle text, and related artwork—is © Wizards of the Coast LLC. All rights reserved.
+      <br><br>
+      <strong>Disclaimer:</strong><br>
+      This project is unofficial fan content permitted under the Wizards of the Coast Fan Content Policy. It is neither affiliated with nor endorsed by Wizards of the Coast LLC.
+    </div>
   </footer>
 
   <script>
