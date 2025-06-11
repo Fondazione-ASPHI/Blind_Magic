@@ -1,6 +1,7 @@
 # Blind Magic by ASPHI Onlus
 
-The aim of this project is to enable blind or visually impaired people to play Magic TCG by using technologies: a 3D printed support and an AI-powered web app to run on a smarpthone.
+The aim of this project is to enable blind or visually impaired people to play Magic: The Gathering TCG. The camera captures the card, and the server application retrieves detailed information from the database. This data is then presented to the client in an accessible format, allowing screen readers such as TalkBack or VoiceOver to read the card's content aloud (in the headphones).
+To ensure proper alignment and consistent recognition, a 3D-printed support is required. The printable file for the support is included in the repository’s release section.
 
 Card search relies on Scryfall database (https://scryfall.com/) using the bulk-downloaded data.
 
